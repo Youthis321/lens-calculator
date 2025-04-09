@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -15,32 +15,16 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 
 export default function Home() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
-
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
-    if (savedTheme) {
-      setTheme(savedTheme);
-      document.body.setAttribute('data-bs-theme', savedTheme);
-    } else {
-      document.body.setAttribute('data-bs-theme', 'light');
-    }
-  }, []);
-
-  const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
-    document.body.setAttribute('data-bs-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
-  };
-
   const [token, setToken] = useState('');
   const [buyPrice, setBuyPrice] = useState('');
   const [targetPrice, setTargetPrice] = useState('');
+  const [currentPrice, setCurrentPrice] = useState<number | null>(null);
+  const [previousPrice, setPreviousPrice] = useState<number | null>(null);
+  const notifiedRef = useRef(false);
 
   const tokenValue = parseFloat(token) || 0;
   const buyPriceValue = parseFloat(buyPrice) || 0;
   const targetPriceValue = parseFloat(targetPrice) || 0;
-
   const isFomo = targetPriceValue >= buyPriceValue * 100;
 
   const rateUSDToIDR = 16000;
@@ -81,14 +65,71 @@ export default function Home() {
   const chartOptions = {
     responsive: true,
     plugins: {
-      legend: {
-        position: 'top' as const
-      },
-      title: {
-        display: true,
-        text: '📈 Simulasi Kenaikan Harga Token'
+      legend: { position: 'top' as const },
+      title: { display: true, text: '📈 Simulasi Kenaikan Harga Token' }
+    }
+  };
+
+  const predictionData = Array.from({ length: 7 }, (_, i) => {
+    return currentPrice ? (currentPrice * Math.pow(1.05, i + 1)) : 0;
+  });
+
+  const predictionChart = {
+    labels: ['+1 Hari', '+2 Hari', '+3 Hari', '+4 Hari', '+5 Hari', '+6 Hari', '+7 Hari'],
+    datasets: [
+      {
+        label: 'Prediksi Harga (USD)',
+        data: predictionData,
+        borderColor: 'rgb(255, 99, 132)',
+        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+        tension: 0.3
+      }
+    ]
+  };
+
+  const notifyUser = (message: string) => {
+    if (Notification.permission === 'granted') {
+      new Notification('📢 Token Alert!', { body: message });
+    }
+  };
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
+    if (savedTheme) {
+      setTheme(savedTheme);
+      document.body.setAttribute('data-bs-theme', savedTheme);
+    } else {
+      document.body.setAttribute('data-bs-theme', 'light');
+    }
+  }, []);
+
+  useEffect(() => {
+    fetch('https://api.coingecko.com/api/v3/simple/price?ids=lens&vs_currencies=usd')
+      .then((res) => res.json())
+      .then((data) => {
+        const newPrice = data.lens?.usd;
+        if (newPrice) {
+          setPreviousPrice(currentPrice);
+          setCurrentPrice(newPrice);
+        }
+      });
+  }, []);
+
+  useEffect(() => {
+    if (currentPrice && previousPrice && !notifiedRef.current) {
+      const diff = ((currentPrice - previousPrice) / previousPrice) * 100;
+      if (diff >= 10) {
+        notifyUser(`Harga LENS naik ${diff.toFixed(2)}%! Sekarang: $${currentPrice}`);
+        notifiedRef.current = true;
       }
     }
+  }, [currentPrice, previousPrice]);
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    document.body.setAttribute('data-bs-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
   };
 
   return (
@@ -141,6 +182,9 @@ export default function Home() {
                   onChange={(e) => setTargetPrice(e.target.value)}
                 />
               </div>
+              {currentPrice && (
+                <p className="text-muted small">Harga LENS saat ini: ${currentPrice}</p>
+              )}
             </div>
           </div>
 
@@ -193,14 +237,14 @@ export default function Home() {
           </div>
 
           <div className="col-md-4">
-            <div className="card shadow-sm p-3 h-100 d-flex flex-column justify-content-between">
-              <h5 className="mb-3 text-center">📉 Grafik Kenaikan</h5>
-              <div>
-                <Line data={chartData} options={chartOptions} />
-              </div>
-              <div className="text-center mt-3">
-                <p className="text-muted small">* Simulasi ini untuk edukasi, bukan saran investasi.</p>
-              </div>
+            <div className="card shadow-sm p-3 mb-4">
+              <h5 className="text-center">📉 Grafik Kenaikan</h5>
+              <Line data={chartData} options={chartOptions} />
+            </div>
+
+            <div className="card shadow-sm p-3">
+              <h5 className="text-center">📅 Prediksi 7 Hari</h5>
+              <Line data={predictionChart} options={{ responsive: true, plugins: { title: { display: true, text: 'Prediksi Harga LENS Mingguan' } } }} />
             </div>
           </div>
         </div>
