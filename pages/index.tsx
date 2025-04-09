@@ -20,6 +20,7 @@ export default function Home() {
   const [targetPrice, setTargetPrice] = useState('');
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [previousPrice, setPreviousPrice] = useState<number | null>(null);
+  const [tokenStats, setTokenStats] = useState<any>(null);
   const notifiedRef = useRef(false);
 
   const tokenValue = parseFloat(token) || 0;
@@ -113,6 +114,20 @@ export default function Home() {
           setCurrentPrice(newPrice);
         }
       });
+
+    fetch('https://api.coingecko.com/api/v3/coins/lens')
+      .then(res => res.json())
+      .then(data => {
+        const stats = {
+          marketCap: data.market_data.market_cap.usd,
+          fdv: data.market_data.fully_diluted_valuation.usd,
+          volume24h: data.market_data.total_volume.usd,
+          circulating: data.market_data.circulating_supply,
+          totalSupply: data.market_data.total_supply,
+          maxSupply: data.market_data.max_supply
+        };
+        setTokenStats(stats);
+      });
   }, []);
 
   useEffect(() => {
@@ -132,6 +147,7 @@ export default function Home() {
     localStorage.setItem('theme', newTheme);
   };
 
+
   return (
     <>
       {isFomo && (
@@ -148,6 +164,24 @@ export default function Home() {
         </div>
 
         <h2 className="text-center mb-4">💰 Kalkulator Token LENS</h2>
+
+        {tokenStats && (
+          <div className="row mb-4">
+            <div className="col-md-12">
+              <div className="card shadow-sm p-3">
+                <h5>📊 Statistik Token LENS (Realtime)</h5>
+                <ul className="list-group list-group-flush">
+                  <li className="list-group-item"><strong>Market Cap:</strong> ${tokenStats.marketCap.toLocaleString()}</li>
+                  <li className="list-group-item"><strong>Fully Diluted Valuation (FDV):</strong> ${tokenStats.fdv.toLocaleString()}</li>
+                  <li className="list-group-item"><strong>Volume 24 Jam:</strong> ${tokenStats.volume24h.toLocaleString()}</li>
+                  <li className="list-group-item"><strong>Circulating Supply:</strong> {tokenStats.circulating.toLocaleString()}</li>
+                  <li className="list-group-item"><strong>Total Supply:</strong> {tokenStats.totalSupply.toLocaleString()}</li>
+                  <li className="list-group-item"><strong>Max Supply:</strong> {tokenStats.maxSupply.toLocaleString()}</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="row g-4">
           <div className="col-md-4">
             <div className="card shadow-sm p-3">
