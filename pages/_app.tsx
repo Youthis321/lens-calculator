@@ -41,13 +41,13 @@ export default function App({ Component, pageProps }: AppProps) {
             <div>🏠</div>
             <small>Dashboard</small>
           </Link>
-          <Link href="/calculator-token" className={`nav-link text-center ${router.pathname === '/calculator-token' ? 'text-primary' : ''}`}>
-            <div>🧮</div>
-            <small>Token</small>
-          </Link>
           <Link href="/calculator-investasi" className={`nav-link text-center ${router.pathname === '/calculator-investasi' ? 'text-primary' : ''}`}>
             <div>📊</div>
             <small>Investasi</small>
+          </Link>
+          <Link href="/calculator-token" className={`nav-link text-center ${router.pathname === '/calculator-token' ? 'text-primary' : ''}`}>
+            <div>🧮</div>
+            <small>Token</small>
           </Link>
           <button onClick={toggleTheme} className="btn btn-sm nav-link text-center border-0">
             <div>{theme === 'light' ? '🌞' : '🌙'}</div>
