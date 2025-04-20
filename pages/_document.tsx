@@ -1,4 +1,4 @@
-import { Html, Head, Main, NextScript } from 'next/document';
+import { Html, Head, Main, NextScript } from 'next/document'
 
 export default function Document() {
   return (
@@ -8,29 +8,16 @@ export default function Document() {
         <link rel="icon" href="/icons/icon-192x192.png" />
         <meta name="theme-color" content="#0d6efd" />
 
-        {/* ✅ OneSignal Web Push SDK */}
-        <script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async></script>
+        {/* Menambahkan Bootstrap Bundle JS untuk Navbar Toggle */}
         <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.OneSignal = window.OneSignal || [];
-              OneSignal.push(function() {
-                OneSignal.init({
-                  appId: "9aea84cf-4a94-4823-a6a5-89f2f08cb29d",
-                  notifyButton: {
-                    enable: true,
-                  },
-                  allowLocalhostAsSecureOrigin: true
-                });
-              });
-            `
-          }}
-        />
+          src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"
+          async
+        ></script>
       </Head>
       <body>
         <Main />
         <NextScript />
       </body>
     </Html>
-  );
+  )
 }
