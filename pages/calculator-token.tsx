@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { Line } from 'react-chartjs-2';
+import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -8,18 +8,46 @@ import {
   LineElement,
   Title,
   Tooltip,
-  Legend
-} from 'chart.js';
+  Legend,
+} from "chart.js";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
+const tokenList = [
+  { id: "bitcoin", name: "Bitcoin", symbol: "BTC", market_cap_change_percentage_24h: 1.2 },
+  { id: "ethereum", name: "Ethereum", symbol: "ETH", market_cap_change_percentage_24h: 2.5 },
+  { id: "solana", name: "Solana", symbol: "SOL", market_cap_change_percentage_24h: 5.7 },
+  { id: "cardano", name: "Cardano", symbol: "ADA", market_cap_change_percentage_24h: -1.2 },
+  { id: "lens", name: "Lens", symbol: "LENS", market_cap_change_percentage_24h: 15.2 },
+  { id: "ripple", name: "XRP", symbol: "XRP", market_cap_change_percentage_24h: 0.8 },
+  { id: "polkadot", name: "Polkadot", symbol: "DOT", market_cap_change_percentage_24h: 3.1 },
+  { id: "dogecoin", name: "Dogecoin", symbol: "DOGE", market_cap_change_percentage_24h: 10.5 },
+  { id: "shiba-inu", name: "Shiba Inu", symbol: "SHIB", market_cap_change_percentage_24h: 8.3 },
+  { id: "chainlink", name: "Chainlink", symbol: "LINK", market_cap_change_percentage_24h: 4.2 },
+  { id: "avalanche", name: "Avalanche", symbol: "AVAX", market_cap_change_percentage_24h: 6.3 },
+  { id: "litecoin", name: "Litecoin", symbol: "LTC", market_cap_change_percentage_24h: 0.5 },
+  { id: "uniswap", name: "Uniswap", symbol: "UNI", market_cap_change_percentage_24h: 1.9 },
+  { id: "bnb", name: "BNB", symbol: "BNB", market_cap_change_percentage_24h: 0.3 },
+  { id: "tron", name: "TRON", symbol: "TRX", market_cap_change_percentage_24h: 1.1 },
+  { id: "monero", name: "Monero", symbol: "XMR", market_cap_change_percentage_24h: 2.8 },
+  { id: "stellar", name: "Stellar", symbol: "XLM", market_cap_change_percentage_24h: -0.7 },
+  { id: "cosmos", name: "Cosmos", symbol: "ATOM", market_cap_change_percentage_24h: 3.4 },
+  { id: "tezos", name: "Tezos", symbol: "XTZ", market_cap_change_percentage_24h: 1.5 },
+  { id: "mantra", name: "MANTRA", symbol: "OM", market_cap_change_percentage_24h: 7.8 },
+  { id: "pepe", name: "Pepe", symbol: "PEPE", market_cap_change_percentage_24h: 25.6 },
+  { id: "bonk", name: "Bonk", symbol: "BONK", market_cap_change_percentage_24h: 18.9 },
+  { id: "near", name: "NEAR Protocol", symbol: "NEAR", market_cap_change_percentage_24h: 5.1 },
+  { id: "aptos", name: "Aptos", symbol: "APT", market_cap_change_percentage_24h: 4.3 },
+];
+
 export default function Home() {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [selectedToken, setSelectedToken] = useState<string>("bitcoin");
   const [token, setToken] = useState('');
   const [buyPrice, setBuyPrice] = useState('');
   const [targetPrice, setTargetPrice] = useState('');
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [previousPrice, setPreviousPrice] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const notifiedRef = useRef(false);
 
   const tokenValue = parseFloat(token) || 0;
@@ -45,7 +73,7 @@ export default function Home() {
   ];
 
   const predictionData = Array.from({ length: 7 }, (_, i) => {
-    return currentPrice ? (currentPrice * Math.pow(1.05, i + 1)) : 0;
+    return currentPrice ? currentPrice * Math.pow(1.05, i + 1) : 0;
   });
 
   const predictionChart = {
@@ -72,26 +100,36 @@ export default function Home() {
   const notifyUser = (message: string) => {
     if (Notification.permission === 'granted') {
       new Notification('📢 Token Alert!', { body: message });
+    } else {
+      Notification.requestPermission();
     }
   };
 
   useEffect(() => {
-    fetch('https://api.coingecko.com/api/v3/simple/price?ids=lens&vs_currencies=usd')
-      .then((res) => res.json())
-      .then((data) => {
-        const newPrice = data.lens?.usd;
-        if (newPrice) {
-          setPreviousPrice(currentPrice);
-          setCurrentPrice(newPrice);
+    fetch(`https://api.coingecko.com/api/v3/coins/${selectedToken}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.market_data && data.market_data.current_price) {
+          setPreviousPrice(currentPrice); // simpan harga lama
+          setCurrentPrice(data.market_data.current_price.usd); // update harga sekarang
+          setError(null);
+        } else {
+          setError('Data harga token tidak tersedia.');
+          setCurrentPrice(null);
         }
+      })
+      .catch(err => {
+        console.error("Error fetching token data:", err);
+        setError('Gagal mengambil data harga token.');
+        setCurrentPrice(null);
       });
-  }, []);
+  }, [selectedToken]);
 
   useEffect(() => {
     if (currentPrice && previousPrice && !notifiedRef.current) {
       const diff = ((currentPrice - previousPrice) / previousPrice) * 100;
       if (diff >= 10) {
-        notifyUser(`Harga LENS naik ${diff.toFixed(2)}%! Sekarang: $${currentPrice}`);
+        notifyUser(`Harga token pilihan kamu naik ${diff.toFixed(2)}%! Sekarang: $${currentPrice}`);
         notifiedRef.current = true;
       }
     }
@@ -105,9 +143,28 @@ export default function Home() {
         </div>
       )}
 
-      <h2 className="text-center mb-4">💰 Kalkulator Token LENS</h2>
+      {error && (
+        <div className="alert alert-danger text-center" role="alert">
+          ⚠️ {error}
+        </div>
+      )}
+
+      <h2 className="text-center mb-4">💰 Kalkulator Token Pilihan</h2>
       <div className="row g-4">
-        {/* Input Investasi */}
+        <div className="mb-3">
+          <label className="form-label">Pilih Token</label>
+          <select className="form-select" value={selectedToken} onChange={(e) => {
+            setSelectedToken(e.target.value);
+            notifiedRef.current = false; // reset notifikasi saat ganti token
+          }}>
+            {tokenList.map(token => (
+              <option key={token.id} value={token.id}>
+                {token.name} ({token.symbol})
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="col-md-4">
           <div className="card shadow-sm p-3">
             <h5>🎯 Input Investasi</h5>
@@ -123,11 +180,10 @@ export default function Home() {
               <label className="form-label">Target Harga Jual ($)</label>
               <input type="number" className="form-control" value={targetPrice} onChange={(e) => setTargetPrice(e.target.value)} />
             </div>
-            {currentPrice && <p className="text-muted small">Harga LENS saat ini: ${currentPrice}</p>}
+            {currentPrice && <p className="text-muted small">Harga Token saat ini: ${currentPrice}</p>}
           </div>
         </div>
 
-        {/* Hasil Simulasi */}
         <div className="col-md-4">
           <div className="card shadow-sm p-3">
             <h5>📊 Simulasi Investasi</h5>
@@ -168,7 +224,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Chart Prediksi */}
         <div className="col-md-4">
           <div className="card shadow-sm p-3">
             <h5>📉 Prediksi Harga Mingguan</h5>
