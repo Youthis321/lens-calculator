@@ -1,14 +1,15 @@
 import 'bootstrap/dist/css/bootstrap.min.css';
-import '../styles/globals.css'; // Jika kamu punya styling tambahan
+import '../styles/globals.css';
 import type { AppProps } from 'next/app';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import OneSignalProvider from './OneSignalProvider'; // Pastikan file ini ada
+import OneSignalProvider from './OneSignalProvider';
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [isClicked, setIsClicked] = useState(false);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
@@ -25,36 +26,63 @@ export default function App({ Component, pageProps }: AppProps) {
     setTheme(newTheme);
     document.body.setAttribute('data-bs-theme', newTheme);
     localStorage.setItem('theme', newTheme);
+
+    // Trigger animasi klik
+    setIsClicked(true);
+    setTimeout(() => setIsClicked(false), 200); // reset animasi
   };
 
   return (
     <>
       <OneSignalProvider />
-      
+
+      {/* Tombol Toggle Tema (kanan atas) */}
+      <button
+        onClick={toggleTheme}
+        className={`btn btn-light position-fixed top-0 end-0 m-3 shadow-sm border rounded-circle d-flex flex-column align-items-center justify-content-center transition-transform ${
+          isClicked ? 'scale-effect' : ''
+        }`}
+        style={{ width: '48px', height: '48px', zIndex: 1050 }}
+        title={`Ubah ke mode ${theme === 'light' ? 'gelap' : 'terang'}`}
+      >
+        <span className="fs-5">{theme === 'light' ? '🌞' : '🌙'}</span>
+      </button>
+
       {/* Halaman utama */}
       <Component {...pageProps} />
 
       {/* Bottom Navbar */}
-      <nav className="navbar fixed-bottom navbar-light bg-light border-top">
-        <div className="container d-flex justify-content-around">
-          <Link href="/" className={`nav-link text-center ${router.pathname === '/' ? 'text-primary' : ''}`}>
-            <div>🏠</div>
-            <small>Dashboard</small>
+      <nav className="navbar fixed-bottom navbar-light bg-light border-top py-2">
+        <div className="container d-flex justify-content-between">
+          <Link href="/" className={`nav-link text-center ${router.pathname === '/' ? 'text-primary' : ''} p-2`}>
+            <div className="fs-4">🏠</div>
+            <small className="d-block">Dashboard</small>
           </Link>
-          <Link href="/calculator-investasi" className={`nav-link text-center ${router.pathname === '/calculator-investasi' ? 'text-primary' : ''}`}>
-            <div>📊</div>
-            <small>Investasi</small>
+          <Link href="/calculator-investasi" className={`nav-link text-center ${router.pathname === '/calculator-investasi' ? 'text-primary' : ''} p-2`}>
+            <div className="fs-4">📊</div>
+            <small className="d-block">Investasi</small>
           </Link>
-          <Link href="/calculator-token" className={`nav-link text-center ${router.pathname === '/calculator-token' ? 'text-primary' : ''}`}>
-            <div>🧮</div>
-            <small>Token</small>
+          <Link href="/calculator-token" className={`nav-link text-center ${router.pathname === '/calculator-token' ? 'text-primary' : ''} p-2`}>
+            <div className="fs-4">🧮</div>
+            <small className="d-block">Token</small>
           </Link>
-          <button onClick={toggleTheme} className="btn btn-sm nav-link text-center border-0">
-            <div>{theme === 'light' ? '🌞' : '🌙'}</div>
-            <small>{theme === 'light' ? 'Terang' : 'Gelap'}</small>
-          </button>
+          <Link href="/signal-token" className={`nav-link text-center ${router.pathname === '/signal-token' ? 'text-primary' : ''} p-2`}>
+            <div className="fs-4">📈</div>
+            <small className="d-block">Signal</small>
+          </Link>
         </div>
       </nav>
+
+      {/* Style animasi scale saat diklik */}
+      <style jsx global>{`
+        .scale-effect {
+          transform: scale(1.2);
+          transition: transform 0.2s ease-in-out;
+        }
+        .transition-transform {
+          transition: transform 0.2s ease-in-out;
+        }
+      `}</style>
     </>
   );
 }

@@ -1,7 +1,7 @@
 {
-    "name": "Kalkulator Token LENS",
-    "short_name": "Token LENS",
-    "description": "Simulasi profit dan strategi token LENS",
+    "name": "TokenQ",
+    "short_name": "TokenQ",
+    "description": "Simulasi profit dan strategi token",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#ffffff",
