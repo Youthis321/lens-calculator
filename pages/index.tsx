@@ -20,6 +20,9 @@ export default function Dashboard() {
   const [searchText, setSearchText] = useState<string>("");
   const [selectedToken, setSelectedToken] = useState<string>("lens");
 
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [canInstall, setCanInstall] = useState(false);
+
   const chartMultipliers = [2, 5, 10, 50, 100, 200, 500];
   const chartLabels = chartMultipliers.map(mult => `${mult}x`);
   const chartDataPoints = chartMultipliers.map(mult => 10000 * 0.0005 * mult);
@@ -68,12 +71,6 @@ export default function Dashboard() {
         { id: "stellar", name: "Stellar", symbol: "XLM", market_cap_change_percentage_24h: -0.7 },
         { id: "cosmos", name: "Cosmos", symbol: "ATOM", market_cap_change_percentage_24h: 3.4 },
         { id: "tezos", name: "Tezos", symbol: "XTZ", market_cap_change_percentage_24h: 1.5 },
-        { id: "lens", name: "Lens Protocol", symbol: "LENS", market_cap_change_percentage_24h: 15.2 },
-        { id: "mantra", name: "MANTRA", symbol: "OM", market_cap_change_percentage_24h: 7.8 },
-        { id: "pepe", name: "Pepe", symbol: "PEPE", market_cap_change_percentage_24h: 25.6 },
-        { id: "bonk", name: "Bonk", symbol: "BONK", market_cap_change_percentage_24h: 18.9 },
-        { id: "near", name: "NEAR Protocol", symbol: "NEAR", market_cap_change_percentage_24h: 5.1 },
-        { id: "aptos", name: "Aptos", symbol: "APT", market_cap_change_percentage_24h: 4.3 },
       ]);
     }
   }, [selectedMethod]);
@@ -114,10 +111,49 @@ export default function Dashboard() {
     token.name.toLowerCase().includes(searchText.toLowerCase())
   );
 
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+
+    deferredPrompt.prompt();
+
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === "accepted") {
+      console.log("User accepted the A2HS prompt");
+    } else {
+      console.log("User dismissed the A2HS prompt");
+    }
+
+    setDeferredPrompt(null);
+    setCanInstall(false);
+  };
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault(); // prevent auto prompt
+      setDeferredPrompt(e);
+      setCanInstall(true);
+    };
+
+    window.addEventListener("beforeinstallprompt", handler);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+    };
+  }, []);
+
   return (
     <div className="container py-5">
       <h1 className="text-center">📊 Dashboard</h1>
       <p className="text-center">Selamat datang di aplikasi kalkulator token dan investasi.</p>
+
+      {/* Install Button */}
+      {canInstall && (
+        <div className="text-center mb-4">
+          <button className="btn btn-primary" onClick={handleInstallClick}>
+            ➕ Install Aplikasi
+          </button>
+        </div>
+      )}
 
       {/* Select Method */}
       <div className="row mb-4">
@@ -134,34 +170,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Search Box */}
-      <div className="row mb-4 position-relative">
-        <div className="col-md-6 offset-md-3">
-          <label className="form-label fw-bold">🔍 Cari Token:</label>
-          <input
-            type="text"
-            className="form-control"
-            placeholder="Ketik nama token, misalnya: Bitcoin"
-            value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-          />
-          {filteredTokens.length > 0 && searchText && (
-            <ul className="list-group position-absolute w-100 zindex-dropdown mt-1" style={{ maxHeight: "200px", overflowY: "auto" }}>
-              {filteredTokens.map(token => (
-                <li
-                  key={token.id}
-                  className="list-group-item list-group-item-action"
-                  style={{ cursor: "pointer" }}
-                  onClick={() => handleTokenSelect(token.id)}
-                >
-                  {token.name}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-
       {/* Token Stats */}
       {tokenStats ? (
         <div className="row mb-4">
@@ -173,41 +181,42 @@ export default function Dashboard() {
                 <li className="list-group-item"><strong>FDV:</strong> ${tokenStats.fdv.toLocaleString()}</li>
                 <li className="list-group-item"><strong>Volume 24 Jam:</strong> ${tokenStats.volume24h.toLocaleString()}</li>
                 <li className="list-group-item"><strong>Circulating Supply:</strong> {tokenStats.circulating.toLocaleString()}</li>
-                <li className="list-group-item"><strong>Total Supply:</strong> {tokenStats.totalSupply?.toLocaleString() ?? '∞'}</li>
-                <li className="list-group-item"><strong>Max Supply:</strong> {tokenStats.maxSupply?.toLocaleString() ?? '∞'}</li>
+                <li className="list-group-item"><strong>Total Supply:</strong> {tokenStats.totalSupply?.toLocaleString() ?? "N/A"}</li>
+                <li className="list-group-item"><strong>Max Supply:</strong> {tokenStats.maxSupply?.toLocaleString() ?? "N/A"}</li>
               </ul>
             </div>
           </div>
         </div>
       ) : (
-        <div className="alert alert-warning text-center">
-          ❗ Data statistik belum tersedia untuk token <strong>{selectedToken.toUpperCase()}</strong>
-        </div>
+        <div className="alert alert-info">Memuat data statistik...</div>
       )}
 
-      {/* Token List */}
-      <div className="row mb-4">
-        <div className="col-md-12">
-          <h5>🪙 Daftar Token (Market Cap Meningkat)</h5>
-          <ul className="list-group">
-            {filteredTokens.map(token => (
-              <li key={token.id} className="list-group-item d-flex justify-content-between align-items-center">
-                {token.name}
-                <span className="badge bg-success">{token.market_cap_change_percentage_24h > 0 ? `+${token.market_cap_change_percentage_24h}%` : ''}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+      {/* Token Select */}
+      <div className="mb-4">
+        <input
+          type="text"
+          className="form-control"
+          placeholder="Cari token..."
+          value={searchText}
+          onChange={e => setSearchText(e.target.value)}
+        />
+        <ul className="list-group mt-2">
+          {filteredTokens.map(token => (
+            <li
+              key={token.id}
+              className="list-group-item d-flex justify-content-between align-items-center"
+              onClick={() => handleTokenSelect(token.id)}
+            >
+              {token.name}
+              <span className="badge bg-primary">{token.symbol.toUpperCase()}</span>
+            </li>
+          ))}
+        </ul>
       </div>
 
       {/* Chart */}
-      <div className="row">
-        <div className="col-md-12">
-          <div className="card shadow-sm p-4">
-            <h5>📈 Grafik Kenaikan Harga Token</h5>
-            <Line data={chartData} />
-          </div>
-        </div>
+      <div className="mb-4">
+        <Line data={chartData} />
       </div>
     </div>
   );
