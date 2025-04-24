@@ -43,7 +43,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (selectedMethod === "dinamis") {
-      fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1")
+      fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1")
         .then(res => res.json())
         .then(data => {
           const tokens = data.filter((token: any) => token.market_cap_change_percentage_24h > 0 || token.market_cap_change_percentage_7d > 0);
