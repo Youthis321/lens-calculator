@@ -13,6 +13,7 @@ export default function App({ Component, pageProps }: AppProps) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isClicked, setIsClicked] = useState(false);
   const [mounted, setMounted] = useState(false); // untuk hindari mismatch SSR/CSR
+  const [hideNavbar, setHideNavbar] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -24,6 +25,23 @@ export default function App({ Component, pageProps }: AppProps) {
     } else {
       document.body.setAttribute('data-bs-theme', 'light');
     }
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      // Cek jika sudah di bawah (5px tolerance)
+      if (
+        window.innerHeight + window.scrollY >=
+        document.body.offsetHeight - 5
+      ) {
+        setHideNavbar(true);
+      } else {
+        setHideNavbar(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const toggleTheme = () => {
@@ -56,10 +74,17 @@ export default function App({ Component, pageProps }: AppProps) {
       </button>
 
       {/* Halaman utama */}
-      <Component {...pageProps} />
+      <div
+        className="main-content container py-5"
+        style={{ paddingBottom: '80px' }} // Tambahkan ini agar konten tidak tertutup navbar
+      >
+        <Component {...pageProps} />
+      </div>
 
       {/* Bottom Navbar */}
-      <nav className={`navbar fixed-bottom ${theme === 'dark' ? 'navbar-dark bg-dark' : 'navbar-light bg-light'} border-top py-2`}>
+      <nav
+        className={`navbar fixed-bottom ${theme === 'dark' ? 'navbar-dark bg-dark' : 'navbar-light bg-light'} border-top py-2${hideNavbar ? ' d-none' : ''}`}
+      >
         <div className="container d-flex justify-content-between">
           <Link href="/" className={`nav-link text-center ${router.pathname === '/' ? 'text-primary' : ''} p-2`}>
             <div className="fs-4">🏠</div>

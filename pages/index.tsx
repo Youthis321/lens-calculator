@@ -148,7 +148,7 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div className="container py-5">
+    <div className="main-content container py-5">
       <h1 className="text-center">📊 Dashboard</h1>
       <p className="text-center">Selamat datang di aplikasi kalkulator token dan investasi.</p>
 

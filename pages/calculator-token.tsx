@@ -10,6 +10,7 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
+import { FaRegCopy, FaPaste } from "react-icons/fa"; // Tambahkan di bagian import
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
@@ -29,8 +30,28 @@ export default function Home() {
   const [previousPrice, setPreviousPrice] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rateUSDToIDR, setRateUSDToIDR] = useState<number>(16000); // default
+  const [history, setHistory] = useState<number[]>([]);
+  const [historyLabels, setHistoryLabels] = useState<string[]>([]);
 
   const notifiedRef = useRef(false);
+
+  // Fungsi copy dan paste
+  const handleCopy = async (value: string | number) => {
+    try {
+      await navigator.clipboard.writeText(String(value));
+    } catch (err) {
+      alert("Gagal menyalin!");
+    }
+  };
+
+  const handlePaste = async (setter: (val: string) => void) => {
+    try {
+      const text = await navigator.clipboard.readText();
+      setter(text.replace(/[^0-9.]/g, "")); // hanya angka/desimal
+    } catch (err) {
+      alert("Gagal paste!");
+    }
+  };
 
   // Ambil kurs dari API
   useEffect(() => {
@@ -143,12 +164,73 @@ export default function Home() {
     }
   }, [currentPrice, previousPrice]);
 
+  useEffect(() => {
+    if (!selectedToken || selectedToken === "lainnya") return;
+
+    const fetchPrice = () => {
+      fetch(`https://api.coingecko.com/api/v3/coins/${selectedToken}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.market_data?.current_price?.usd) {
+            setCurrentPrice(data.market_data.current_price.usd);
+          }
+        });
+    };
+
+    fetchPrice();
+    const interval = setInterval(fetchPrice, 30000); // 30 detik
+    return () => clearInterval(interval);
+  }, [selectedToken]);
+
+  useEffect(() => {
+    if (!selectedToken || selectedToken === "lainnya") return;
+    fetch(`https://api.coingecko.com/api/v3/coins/${selectedToken}/market_chart?vs_currency=usd&days=7`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.prices) {
+          setHistory(data.prices.map((p: [number, number]) => p[1]));
+          setHistoryLabels(data.prices.map((p: [number, number]) => {
+            const d = new Date(p[0]);
+            return `${d.getDate()}/${d.getMonth() + 1}`;
+          }));
+        }
+      });
+  }, [selectedToken]);
+
   const notifyUser = (message: string) => {
     if (Notification.permission === 'granted') {
       new Notification('📢 Token Alert!', { body: message });
     } else {
       Notification.requestPermission();
     }
+  };
+
+  const handleReset = () => {
+    setToken('');
+    setBuyPrice('');
+    setTargetPrice('');
+    setManualTokenPriceUSD('');
+    setSelectedToken('bitcoin');
+    setError(null);
+  };
+
+  const handleExportCSV = () => {
+    const rows = [
+      ["Jumlah Token", token],
+      ["Harga Beli", buyPrice],
+      ["Target Harga", targetPrice],
+      ["Total Nilai (USD)", potential],
+      ["Total Investasi (USD)", invested],
+      ["Profit (USD)", profit]
+    ];
+    const csv = rows.map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "simulasi-token.csv";
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const tokenValue = parseFloat(token) || 0;
@@ -189,6 +271,19 @@ export default function Home() {
     ]
   };
 
+  const historyChart = {
+    labels: historyLabels,
+    datasets: [
+      {
+        label: 'Harga 7 Hari (USD)',
+        data: history,
+        borderColor: 'rgb(54, 162, 235)',
+        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+        tension: 0.3
+      }
+    ]
+  };
+
   const chartOptions = {
     responsive: true,
     plugins: {
@@ -198,7 +293,7 @@ export default function Home() {
   };
 
   return (
-    <div className="container py-5">
+    <div className="main-content container py-5">
       {isFomo && (
         <div className="alert alert-warning text-center" role="alert">
           🚨 <strong>FOMO Alert!</strong> Target harga kamu sangat tinggi. Pastikan ini berdasarkan analisa, bukan emosi! 🚀
@@ -247,17 +342,88 @@ export default function Home() {
             <h5>🎯 Input Investasi</h5>
             <div className="mb-3">
               <label className="form-label">Jumlah Token</label>
-              <input type="number" className="form-control" value={token} onChange={(e) => setToken(e.target.value)} />
+              <div className="input-group">
+                <input
+                  type="number"
+                  className="form-control"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                />
+                <button
+                  className="btn btn-outline-secondary"
+                  type="button"
+                  title="Copy"
+                  onClick={() => handleCopy(token)}
+                >
+                  <FaRegCopy />
+                </button>
+                <button
+                  className="btn btn-outline-secondary"
+                  type="button"
+                  title="Paste"
+                  onClick={() => handlePaste(setToken)}
+                >
+                  <FaPaste />
+                </button>
+              </div>
             </div>
             <div className="mb-3">
               <label className="form-label">Harga Beli per Token ($)</label>
-              <input type="number" className="form-control" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)} />
+              <div className="input-group">
+                <input
+                  type="number"
+                  className="form-control"
+                  value={buyPrice}
+                  onChange={(e) => setBuyPrice(e.target.value)}
+                />
+                <button
+                  className="btn btn-outline-secondary"
+                  type="button"
+                  title="Copy"
+                  onClick={() => handleCopy(buyPrice)}
+                >
+                  <FaRegCopy />
+                </button>
+                <button
+                  className="btn btn-outline-secondary"
+                  type="button"
+                  title="Paste"
+                  onClick={() => handlePaste(setBuyPrice)}
+                >
+                  <FaPaste />
+                </button>
+              </div>
             </div>
             <div className="mb-3">
               <label className="form-label">Target Harga Jual ($)</label>
-              <input type="number" className="form-control" value={targetPrice} onChange={(e) => setTargetPrice(e.target.value)} />
+              <div className="input-group">
+                <input
+                  type="number"
+                  className="form-control"
+                  value={targetPrice}
+                  onChange={(e) => setTargetPrice(e.target.value)}
+                />
+                <button
+                  className="btn btn-outline-secondary"
+                  type="button"
+                  title="Copy"
+                  onClick={() => handleCopy(targetPrice)}
+                >
+                  <FaRegCopy />
+                </button>
+                <button
+                  className="btn btn-outline-secondary"
+                  type="button"
+                  title="Paste"
+                  onClick={() => handlePaste(setTargetPrice)}
+                >
+                  <FaPaste />
+                </button>
+              </div>
             </div>
             {currentPrice && <p className="text-muted small">Harga Token saat ini: ${currentPrice}</p>}
+            <button className="btn btn-secondary mb-3" onClick={handleReset}>Reset</button>
+            <button className="btn btn-success mb-3 ms-2" onClick={handleExportCSV}>Export CSV</button>
           </div>
         </div>
 
@@ -305,6 +471,13 @@ export default function Home() {
           <div className="card shadow-sm p-3">
             <h5>📉 Prediksi Harga Mingguan</h5>
             <Line data={predictionChart} options={chartOptions} />
+          </div>
+        </div>
+
+        <div className="col-md-12 mt-4">
+          <div className="card shadow-sm p-3">
+            <h5>📉 Grafik Harga 7 Hari Terakhir</h5>
+            <Line data={historyChart} options={chartOptions} />
           </div>
         </div>
       </div>
