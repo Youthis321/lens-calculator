@@ -421,7 +421,19 @@ export default function Home() {
                 </button>
               </div>
             </div>
-            {currentPrice && <p className="text-muted small">Harga Token saat ini: ${currentPrice}</p>}
+            {currentPrice && (
+                <div className="d-flex align-items-center">
+                  <p className="text-muted small mb-0">Harga Token saat ini: ${currentPrice}</p>
+                  <button
+                    className="btn btn-outline-secondary ms-2"
+                    type="button"
+                    title="Copy"
+                    onClick={() => handleCopy(currentPrice)}
+                  >
+                    <FaRegCopy />
+                  </button>
+                </div>
+              )}
             <button className="btn btn-secondary mb-3" onClick={handleReset}>Reset</button>
             <button className="btn btn-success mb-3 ms-2" onClick={handleExportCSV}>Export CSV</button>
           </div>

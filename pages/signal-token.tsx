@@ -26,10 +26,28 @@ interface Token {
   sparkline_in_7d?: {
     price: number[];
   };
+  twitter_username?: string;
 }
 
 const SIGNAL_THRESHOLD = 10;
 const NOTIFY_THRESHOLD = 15;
+
+const fetchTokenDetails = async (id: string) => {
+  const res = await fetch(`https://api.coingecko.com/api/v3/coins/${id}`);
+  const data = await res.json();
+  return {
+    id: data.id,
+    name: data.name,
+    symbol: data.symbol,
+    image: data.image.large,
+    current_price: data.market_data.current_price.usd,
+    price_change_percentage_1h_in_currency: data.market_data.price_change_percentage_1h_in_currency.usd,
+    price_change_percentage_24h_in_currency: data.market_data.price_change_percentage_24h_in_currency.usd,
+    total_volume: data.market_data.total_volume.usd,
+    sparkline_in_7d: data.market_data.sparkline_7d,
+    twitter_username: data.links.twitter_screen_name,
+  };
+};
 
 function notifyUser(title: string, message: string) {
   if (typeof window !== 'undefined' && 'OneSignal' in window) {
@@ -50,10 +68,41 @@ export default function SignalTokenPage() {
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [fetchError, setFetchError] = useState<string | null>(null);
 
+  // Helper to generate date labels for sparkline (7 days)
+  function getSparklineLabels(prices: number[]) {
+    const now = new Date();
+    return prices.map((_, i, arr) => {
+      const daysAgo = arr.length - 1 - i;
+      const date = new Date(now);
+      date.setDate(now.getDate() - daysAgo);
+      return date.toLocaleDateString();
+    });
+  }
+
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: { mode: 'index' as const, intersect: false },
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { display: false },
+      },
+      y: {
+        ticks: {
+          callback: (value: number) => `$${value}`,
+        },
+      },
+    },
+  };
+
   async function fetchTokens() {
     try {
       setLoading(true);
       setFetchError(null);
+
       const res = await fetch(
         'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&sparkline=true&price_change_percentage=1h,24h,7d'
       );
@@ -66,7 +115,20 @@ export default function SignalTokenPage() {
           token.price_change_percentage_24h_in_currency >= SIGNAL_THRESHOLD
       );
 
-      filtered.forEach((token) => {
+      // Ambil detail token (termasuk twitter_username) secara paralel
+      const tokensWithTwitter = await Promise.all(
+        filtered.map(async (token) => {
+          try {
+            const detail = await fetchTokenDetails(token.id);
+            return { ...token, twitter_username: detail.twitter_username };
+          } catch {
+            return { ...token, twitter_username: undefined };
+          }
+        })
+      );
+
+      // Kirim notifikasi jika memenuhi threshold
+      tokensWithTwitter.forEach((token) => {
         if (
           token.price_change_percentage_1h_in_currency >= NOTIFY_THRESHOLD ||
           token.price_change_percentage_24h_in_currency >= NOTIFY_THRESHOLD
@@ -78,7 +140,8 @@ export default function SignalTokenPage() {
         }
       });
 
-      const sorted = filtered.sort((a, b) => b.total_volume - a.total_volume);
+      // Urutkan berdasarkan volume
+      const sorted = tokensWithTwitter.sort((a, b) => b.total_volume - a.total_volume);
 
       setTokens(sorted);
       setLastUpdated(new Date().toLocaleString());
@@ -95,45 +158,6 @@ export default function SignalTokenPage() {
     const interval = setInterval(fetchTokens, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
-
-  const chartOptions = {
-    responsive: true,
-    plugins: {
-      legend: {
-        display: false,
-      },
-      tooltip: {
-        mode: 'index' as const,
-        intersect: false,
-      },
-    },
-    scales: {
-      x: {
-        grid: {
-          display: false,
-        },
-        ticks: {
-          display: false,
-        },
-      },
-      y: {
-        ticks: {
-          callback: (value: number) => `$${value}`,
-        },
-      },
-    },
-  };
-
-  // Helper to generate date labels for sparkline (7 days)
-  function getSparklineLabels(prices: number[]) {
-    const now = new Date();
-    return prices.map((_, i, arr) => {
-      const daysAgo = arr.length - 1 - i;
-      const date = new Date(now);
-      date.setDate(now.getDate() - daysAgo);
-      return date.toLocaleDateString();
-    });
-  }
 
   return (
     <div className="main-content min-h-screen bg-gradient-to-b from-purple-100 to-white p-4 sm:p-6 md:p-8">
@@ -155,7 +179,9 @@ export default function SignalTokenPage() {
       {loading ? (
         <div className="text-center text-gray-500">Loading data...</div>
       ) : tokens.length === 0 ? (
-        <div className="text-center text-gray-600">🚫 Tidak ada token yang naik ≥{SIGNAL_THRESHOLD}% dalam 1h atau 24h.</div>
+        <div className="text-center text-gray-600">
+          🚫 Tidak ada token yang naik ≥{SIGNAL_THRESHOLD}% dalam 1h atau 24h.
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {tokens.map((token) => (
@@ -168,10 +194,46 @@ export default function SignalTokenPage() {
                 </div>
               </div>
               <div className="space-y-1 text-sm text-gray-700">
-                <p>💵 Price: <span className="font-medium text-gray-900">${token.current_price.toLocaleString()}</span></p>
-                <p>📈 1h: <span className={`font-semibold ${token.price_change_percentage_1h_in_currency >= 0 ? 'text-green-600' : 'text-red-600'}`}>{token.price_change_percentage_1h_in_currency.toFixed(2)}%</span></p>
-                <p>📊 24h: <span className={`font-semibold ${token.price_change_percentage_24h_in_currency >= 0 ? 'text-green-600' : 'text-red-600'}`}>{token.price_change_percentage_24h_in_currency.toFixed(2)}%</span></p>
+                <p>
+                  💵 Price: <span className="font-medium text-gray-900">${token.current_price.toLocaleString()}</span>
+                </p>
+                <p>
+                  📈 1h:{' '}
+                  <span
+                    className={`font-semibold ${
+                      token.price_change_percentage_1h_in_currency >= 0
+                        ? 'text-green-600'
+                        : 'text-red-600'
+                    }`}
+                  >
+                    {token.price_change_percentage_1h_in_currency.toFixed(2)}%
+                  </span>
+                </p>
+                <p>
+                  📊 24h:{' '}
+                  <span
+                    className={`font-semibold ${
+                      token.price_change_percentage_24h_in_currency >= 0
+                        ? 'text-green-600'
+                        : 'text-red-600'
+                    }`}
+                  >
+                    {token.price_change_percentage_24h_in_currency.toFixed(2)}%
+                  </span>
+                </p>
                 <p>🔁 Volume: ${token.total_volume.toLocaleString()}</p>
+                {token.twitter_username ? (
+                  <a
+                    href={`https://x.com/${token.twitter_username}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center px-2 py-0.5 bg-black text-white rounded text-xs hover:bg-gray-800 transition mt-2"
+                  >
+                    X
+                  </a>
+                ) : (
+                  <span className="text-gray-400 text-xs mt-2 inline-block">Tidak ada akun X</span>
+                )}
               </div>
               <div className="mt-3">
                 {token.sparkline_in_7d?.price && (

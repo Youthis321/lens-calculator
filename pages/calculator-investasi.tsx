@@ -102,6 +102,50 @@ export default function InvestmentCalculator() {
     });
   }, []);
   
+  // Tambahkan useEffect untuk load dari localStorage saat mount
+  useEffect(() => {
+    const saved = localStorage.getItem("investmentCalculatorData");
+    if (saved) {
+      const data = JSON.parse(saved);
+      if (data.selectedToken) setSelectedToken(data.selectedToken);
+      if (data.investmentIDR) setInvestmentIDR(data.investmentIDR);
+      if (data.manualTokenPriceUSD) setManualTokenPriceUSD(data.manualTokenPriceUSD);
+      if (data.targetTokenAmount) setTargetTokenAmount(data.targetTokenAmount);
+      if (data.futurePrice) setFuturePrice(data.futurePrice);
+      if (data.monthlyInvestment) setMonthlyInvestment(data.monthlyInvestment);
+      if (data.idrValue) setIdrValue(data.idrValue);
+      if (data.usdValue) setUsdValue(data.usdValue);
+      if (data.selectedMethod) setSelectedMethod(data.selectedMethod);
+    }
+  }, []);
+
+  // Simpan ke localStorage setiap kali field utama berubah
+  useEffect(() => {
+    localStorage.setItem(
+      "investmentCalculatorData",
+      JSON.stringify({
+        selectedToken,
+        investmentIDR,
+        manualTokenPriceUSD,
+        targetTokenAmount,
+        futurePrice,
+        monthlyInvestment,
+        idrValue,
+        usdValue,
+        selectedMethod,
+      })
+    );
+  }, [
+    selectedToken,
+    investmentIDR,
+    manualTokenPriceUSD,
+    targetTokenAmount,
+    futurePrice,
+    monthlyInvestment,
+    idrValue,
+    usdValue,
+    selectedMethod,
+  ]);
 
   // Ambil daftar token dari API atau gunakan data statis
   useEffect(() => {
@@ -362,8 +406,26 @@ export default function InvestmentCalculator() {
             {error && <div className="alert alert-danger">{error}</div>}
 
             <div className="mt-3">
-              <p>📈 Harga Saat Ini: {tokenPriceUSD ? `$${tokenPriceUSD}` : "Loading..."}</p>
-              <p>🎯 Token Didapat: {tokensReceived.toFixed(4)}</p>
+              <p>📈 Harga Saat Ini: {tokenPriceUSD ? `$${tokenPriceUSD}` : "Loading..."} 
+                <button
+                  className="btn btn-outline-secondary ms-2"
+                  type="button"
+                  title="Copy"
+                  onClick={() => tokenPriceUSD !== null && handleCopy(tokenPriceUSD)}
+                >
+                  <FaRegCopy />
+                </button>
+              </p>
+              <p>🎯 Token Didapat: {tokensReceived.toFixed(4)}
+                <button
+                  className="btn btn-outline-secondary ms-2"
+                  type="button"
+                  title="Copy"
+                  onClick={() => handleCopy(tokensReceived)}
+                >
+                  <FaRegCopy />
+                </button>
+              </p>
 
               {/* Form Konversi IDR ⇌ USD */}
               <div className="card shadow-sm p-4 mt-5">
@@ -491,6 +553,7 @@ export default function InvestmentCalculator() {
                 value={timeframe} 
                 onChange={(e) => setTimeframe(e.target.value)}
               >
+                <option value="1">24 Jam</option>
                 <option value="7">7 Hari</option>
                 <option value="30">30 Hari</option>
                 <option value="90">90 Hari</option>
