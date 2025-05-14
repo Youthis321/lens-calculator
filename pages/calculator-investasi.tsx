@@ -35,6 +35,33 @@ interface MarketData {
   low_24h: number;
 }
 
+// Add these utility functions after the existing interfaces
+const isValidNumber = (value: string): boolean => {
+  const num = Number(value);
+  return !isNaN(num) && num >= 0;
+};
+
+const formatNumberInput = (value: string): string => {
+  return value.replace(/[^0-9.]/g, '');
+};
+
+// Add this utility function for API retries
+const fetchWithRetry = async (url: string, maxRetries = 3) => {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (err) {
+      if (i === maxRetries - 1) throw err;
+      // Exponential backoff
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+    }
+  }
+};
+
 export default function InvestmentCalculator() {
   const [selectedToken, setSelectedToken] = useState<string>("bitcoin");
   const [investmentIDR, setInvestmentIDR] = useState<string>("");
@@ -193,23 +220,23 @@ export default function InvestmentCalculator() {
   // Ambil harga token terpilih
   useEffect(() => {
     if (!selectedToken) return;
-  
-    // Jika token adalah "lainnya", abaikan fetch
+
     if (selectedToken === "lainnya") {
       const manualPrice = parseFloat(manualTokenPriceUSD);
-      if (!isNaN(manualPrice)) {
+      if (!isNaN(manualPrice) && manualPrice > 0) {
         setTokenPriceUSD(manualPrice);
+        setError(null);
       } else {
         setTokenPriceUSD(null);
+        if (manualTokenPriceUSD !== '') {
+          setError("Masukkan harga token yang valid");
+        }
       }
       return;
     }
-  
-    fetch(`https://api.coingecko.com/api/v3/coins/${selectedToken}`)
-      .then((res) => {
-        if (!res.ok) throw new Error("Token tidak ditemukan");
-        return res.json();
-      })
+
+    setIsLoading(true);
+    fetchWithRetry(`https://api.coingecko.com/api/v3/coins/${selectedToken}`)
       .then((data) => {
         if (data.market_data?.current_price?.usd) {
           setTokenPriceUSD(data.market_data.current_price.usd);
@@ -221,8 +248,11 @@ export default function InvestmentCalculator() {
       })
       .catch((err) => {
         console.error("Error fetching token data:", err);
-        setError("Gagal mengambil data harga token.");
+        setError("Gagal mengambil data harga token. Mencoba lagi...");
         setTokenPriceUSD(null);
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
   }, [selectedToken, manualTokenPriceUSD]);
   
@@ -317,9 +347,65 @@ export default function InvestmentCalculator() {
     }
   };
 
+  // Tambahkan fungsi handleReset setelah fungsi handlePaste:
+  const handleReset = () => {
+    // Hapus data dari localStorage
+    localStorage.removeItem("investmentCalculatorData");
+    
+    // Reset semua state ke nilai awal
+    setSelectedToken("bitcoin");
+    setInvestmentIDR("");
+    setManualTokenPriceUSD("");
+    setTargetTokenAmount("");
+    setFuturePrice("");
+    setMonthlyInvestment("");
+    setIdrValue(0);
+    setUsdValue(0);
+    setSelectedMethod("statis");
+  };
+
+  // Replace the existing input handlers with validated versions
+  const handleInvestmentChange = (value: string) => {
+    const formatted = formatNumberInput(value);
+    if (formatted === '' || isValidNumber(formatted)) {
+      setInvestmentIDR(formatted);
+    }
+  };
+
+  const handleFuturePriceChange = (value: string) => {
+    const formatted = formatNumberInput(value);
+    if (formatted === '' || isValidNumber(formatted)) {
+      setFuturePrice(formatted);
+    }
+  };
+
+  const handleMonthlyInvestmentChange = (value: string) => {
+    const formatted = formatNumberInput(value);
+    if (formatted === '' || isValidNumber(formatted)) {
+      setMonthlyInvestment(formatted);
+    }
+  };
+
+  const handleManualPriceChange = (value: string) => {
+    const formatted = formatNumberInput(value);
+    if (formatted === '' || isValidNumber(formatted)) {
+      setManualTokenPriceUSD(formatted);
+    }
+  };
+
   return (
     <div className="main-content container py-4">
       <h2 className="mb-4 text-center">💰 Kalkulator Investasi Token Pilihan</h2>
+      
+      <div className="text-center mb-4">
+        <button
+          className="btn btn-danger"
+          onClick={handleReset}
+          title="Reset semua data"
+        >
+          🔄 Reset Kalkulator
+        </button>
+      </div>
 
       {/* Pilihan Metode */}
       <div className="row mb-4">
@@ -354,17 +440,16 @@ export default function InvestmentCalculator() {
               </select>
             </div>
 
+            {/* Update the investment input */}
             <div className="mb-3">
               <label className="form-label">Jumlah Investasi (IDR)</label>
               <div className="input-group">
                 <input
-                  type="number"
-                  className="form-control"
+                  type="text"
+                  className={`form-control ${investmentIDR && !isValidNumber(investmentIDR) ? 'is-invalid' : ''}`}
                   value={investmentIDR}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9]/g, ""); // Hanya angka
-                    setInvestmentIDR(value);
-                  }}
+                  onChange={(e) => handleInvestmentChange(e.target.value)}
+                  placeholder="Masukkan jumlah investasi"
                 />
                 <button
                   className="btn btn-outline-secondary"
@@ -383,25 +468,32 @@ export default function InvestmentCalculator() {
                   <FaPaste />
                 </button>
               </div>
+              {investmentIDR && !isValidNumber(investmentIDR) && (
+                <div className="invalid-feedback">Masukkan jumlah yang valid</div>
+              )}
             </div>
 
-            {/* jika pilhan token lainnya, maka tampil form inputan token harga lainnya */}
+            {/* Update the manual token price input */}
             {selectedToken === "lainnya" && (
               <div className="mb-3">
                 <label className="form-label">Harga Token (USD) - Manual</label>
-                <input
-                  type="number"
-                  className="form-control"
-                  value={manualTokenPriceUSD}
-                  onChange={(e) => {
-                    setManualTokenPriceUSD(e.target.value);
-                  }}
-                  placeholder="Contoh: 0.0005"
-                />
+                <div className="input-group">
+                  <input
+                    type="text"
+                    className={`form-control ${manualTokenPriceUSD && !isValidNumber(manualTokenPriceUSD) ? 'is-invalid' : ''}`}
+                    value={manualTokenPriceUSD}
+                    onChange={(e) => handleManualPriceChange(e.target.value)}
+                    placeholder="Contoh: 0.0005"
+                  />
+                </div>
+                {manualTokenPriceUSD && !isValidNumber(manualTokenPriceUSD) && (
+                  <div className="invalid-feedback">Masukkan harga yang valid</div>
+                )}
+                {!manualTokenPriceUSD && (
+                  <small className="text-muted">Masukkan harga token untuk melanjutkan kalkulasi</small>
+                )}
               </div>
             )}
-
-
 
             {error && <div className="alert alert-danger">{error}</div>}
 
@@ -583,7 +675,7 @@ export default function InvestmentCalculator() {
                   type="number"
                   className="form-control"
                   value={futurePrice}
-                  onChange={(e) => setFuturePrice(e.target.value)}
+                  onChange={(e) => handleFuturePriceChange(e.target.value)}
                   placeholder="Contoh: 1.5"
                 />
                 <button
@@ -626,7 +718,7 @@ export default function InvestmentCalculator() {
                   type="number"
                   className="form-control"
                   value={monthlyInvestment}
-                  onChange={(e) => setMonthlyInvestment(e.target.value)}
+                  onChange={(e) => handleMonthlyInvestmentChange(e.target.value)}
                   placeholder="Contoh: 1000000"
                 />
                 <button
