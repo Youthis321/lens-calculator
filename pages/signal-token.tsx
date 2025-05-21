@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -10,57 +9,12 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
+import { Token } from '../types/token';
+import { TokenCard } from '../components/TokenCard';
+import { SIGNAL_THRESHOLD, NOTIFY_THRESHOLD, fetchTokenDetails, notifyUser } from '../utils/tokenUtils';
 
 // Register Chart.js components
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
-
-interface Token {
-  id: string;
-  name: string;
-  symbol: string;
-  image: string;
-  current_price: number;
-  price_change_percentage_1h_in_currency: number;
-  price_change_percentage_24h_in_currency: number;
-  total_volume: number;
-  sparkline_in_7d?: {
-    price: number[];
-  };
-  twitter_username?: string;
-}
-
-const SIGNAL_THRESHOLD = 10;
-const NOTIFY_THRESHOLD = 15;
-
-const fetchTokenDetails = async (id: string) => {
-  const res = await fetch(`https://api.coingecko.com/api/v3/coins/${id}`);
-  const data = await res.json();
-  return {
-    id: data.id,
-    name: data.name,
-    symbol: data.symbol,
-    image: data.image.large,
-    current_price: data.market_data.current_price.usd,
-    price_change_percentage_1h_in_currency: data.market_data.price_change_percentage_1h_in_currency.usd,
-    price_change_percentage_24h_in_currency: data.market_data.price_change_percentage_24h_in_currency.usd,
-    total_volume: data.market_data.total_volume.usd,
-    sparkline_in_7d: data.market_data.sparkline_7d,
-    twitter_username: data.links.twitter_screen_name,
-  };
-};
-
-function notifyUser(title: string, message: string) {
-  if (typeof window !== 'undefined' && 'OneSignal' in window) {
-    (window as any).OneSignal.push(() => {
-      (window as any).OneSignal.sendSelfNotification(
-        title,
-        message,
-        'https://lens-calculator.vercel.app/signal-token',
-        'https://lens-calculator.vercel.app/icons/icon-512x512.png'
-      );
-    });
-  }
-}
 
 export default function SignalTokenPage() {
   const [tokens, setTokens] = useState<Token[]>([]);
@@ -68,8 +22,7 @@ export default function SignalTokenPage() {
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Helper to generate date labels for sparkline (7 days)
-  function getSparklineLabels(prices: number[]) {
+  const getSparklineLabels = (prices: number[]) => {
     const now = new Date();
     return prices.map((_, i, arr) => {
       const daysAgo = arr.length - 1 - i;
@@ -77,7 +30,7 @@ export default function SignalTokenPage() {
       date.setDate(now.getDate() - daysAgo);
       return date.toLocaleDateString();
     });
-  }
+  };
 
   const chartOptions = {
     responsive: true,
@@ -185,76 +138,12 @@ export default function SignalTokenPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {tokens.map((token) => (
-            <div key={token.id} className="bg-white rounded-xl shadow-md p-5 transition hover:shadow-xl">
-              <div className="flex items-center gap-4 mb-4">
-                <img src={token.image} alt={token.name} className="w-10 h-10 rounded-full border border-gray-200" />
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-800">{token.name}</h2>
-                  <p className="text-sm text-gray-500 uppercase">{token.symbol}</p>
-                </div>
-              </div>
-              <div className="space-y-1 text-sm text-gray-700">
-                <p>
-                  💵 Price: <span className="font-medium text-gray-900">${token.current_price.toLocaleString()}</span>
-                </p>
-                <p>
-                  📈 1h:{' '}
-                  <span
-                    className={`font-semibold ${
-                      token.price_change_percentage_1h_in_currency >= 0
-                        ? 'text-green-600'
-                        : 'text-red-600'
-                    }`}
-                  >
-                    {token.price_change_percentage_1h_in_currency.toFixed(2)}%
-                  </span>
-                </p>
-                <p>
-                  📊 24h:{' '}
-                  <span
-                    className={`font-semibold ${
-                      token.price_change_percentage_24h_in_currency >= 0
-                        ? 'text-green-600'
-                        : 'text-red-600'
-                    }`}
-                  >
-                    {token.price_change_percentage_24h_in_currency.toFixed(2)}%
-                  </span>
-                </p>
-                <p>🔁 Volume: ${token.total_volume.toLocaleString()}</p>
-                {token.twitter_username ? (
-                  <a
-                    href={`https://x.com/${token.twitter_username}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center px-2 py-0.5 bg-black text-white rounded text-xs hover:bg-gray-800 transition mt-2"
-                  >
-                    X
-                  </a>
-                ) : (
-                  <span className="text-gray-400 text-xs mt-2 inline-block">Tidak ada akun X</span>
-                )}
-              </div>
-              <div className="mt-3">
-                {token.sparkline_in_7d?.price && (
-                  <Line
-                    data={{
-                      labels: getSparklineLabels(token.sparkline_in_7d.price),
-                      datasets: [
-                        {
-                          label: `${token.name} Price Movement`,
-                          data: token.sparkline_in_7d.price,
-                          borderColor: '#4c51bf',
-                          backgroundColor: 'rgba(76, 81, 191, 0.2)',
-                          fill: true,
-                        },
-                      ],
-                    }}
-                    options={chartOptions}
-                  />
-                )}
-              </div>
-            </div>
+            <TokenCard
+              key={token.id}
+              token={token}
+              chartOptions={chartOptions}
+              getSparklineLabels={getSparklineLabels}
+            />
           ))}
         </div>
       )}

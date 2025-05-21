@@ -8,6 +8,8 @@ import { useEffect, useState } from 'react';
 import OneSignalProvider from './OneSignalProvider';
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Layout } from '../components/Layout'
+import { BottomNavbar } from '../components/BottomNavbar';
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
@@ -76,36 +78,14 @@ export default function App({ Component, pageProps }: AppProps) {
       </button>
 
       {/* Halaman utama */}
-      <div
-        className="main-content container py-5"
-        style={{ paddingBottom: '80px' }} // Tambahkan ini agar konten tidak tertutup navbar
-      >
-        <Component {...pageProps} />
+      <div className="main-content container py-5" style={{ paddingBottom: '80px' }}>
+        <Layout>
+          <Component {...pageProps} />
+        </Layout>
       </div>
 
-      {/* Bottom Navbar */}
-      <nav
-        className={`navbar fixed-bottom ${theme === 'dark' ? 'navbar-dark bg-dark' : 'navbar-light bg-light'} border-top py-2${hideNavbar ? ' d-none' : ''}`}
-      >
-        <div className="container d-flex justify-content-between">
-          <Link href="/" className={`nav-link text-center ${router.pathname === '/' ? 'text-primary' : ''} p-2`}>
-            <div className="fs-4">🏠</div>
-            <small className="d-block">Dashboard</small>
-          </Link>
-          <Link href="/calculator-investasi" className={`nav-link text-center ${router.pathname === '/calculator-investasi' ? 'text-primary' : ''} p-2`}>
-            <div className="fs-4">📊</div>
-            <small className="d-block">Investasi</small>
-          </Link>
-          <Link href="/calculator-token" className={`nav-link text-center ${router.pathname === '/calculator-token' ? 'text-primary' : ''} p-2`}>
-            <div className="fs-4">🧮</div>
-            <small className="d-block">Token</small>
-          </Link>
-          <Link href="/signal-token" className={`nav-link text-center ${router.pathname === '/signal-token' ? 'text-primary' : ''} p-2`}>
-            <div className="fs-4">📈</div>
-            <small className="d-block">Signal</small>
-          </Link>
-        </div>
-      </nav>
+      {/* Bottom Navbar Component */}
+      <BottomNavbar theme={theme} hideNavbar={hideNavbar} />
 
       {/* Global Style: Efek klik tema */}
       <style jsx global>{`

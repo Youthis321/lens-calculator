@@ -12,6 +12,8 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
+import { FormInput } from '../components/FormInput'
+import { CalculationResult } from '../components/CalculationResult'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
